@@ -1,0 +1,6 @@
+# Only what the image needs.
+*
+!pyproject.toml
+!uv.lock
+!app/
+**/__pycache__

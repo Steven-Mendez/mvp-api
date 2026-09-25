@@ -1,0 +1,138 @@
+[project]
+name = "mvp-api"
+version = "0.1.0"
+description = "Serverless FastAPI backend for the MVP web and mobile apps"
+requires-python = ">=3.14"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "boto3>=1.43.102",
+    "email-validator>=2.3.0",
+    "fastapi>=0.141.1",
+    "greenlet>=3.5.6",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "pillow>=12.3.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pyjwt[crypto]>=2.15.0",
+    "scalar-fastapi>=1.9.0",
+    "sqlalchemy>=2.0.54",
+    "uvicorn>=0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "alembic>=1.20.0",
+    "boto3-stubs-lite[cognito-idp,dsql,dynamodb,s3,sesv2]>=1.43.102",
+    "httpx2>=2.13.1",
+    "import-linter>=2.15",
+    "pre-commit>=4.6.2",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.9",
+]
+
+[tool.uv]
+package = false
+
+# --- Lint & format ---------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "A",        # builtins shadowing
+    "C4",       # comprehensions
+    "DTZ",      # naive datetimes
+    "T20",      # print
+    "SIM",      # simplify
+    "RET",      # return
+    "PIE",
+    "PERF",
+    "PTH",      # pathlib
+    "ASYNC",
+    "S",        # bandit (security)
+    "LOG", "G", # logging
+    "FAST",     # FastAPI
+    "TID",      # tidy imports
+    "RUF",
+]
+ignore = [
+    "B008",     # FastAPI's Depends() in defaults
+    "FAST003",  # `{slug}` is read by the workspace dependency, not the route function
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"migrations/**" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# --- Types -------------------------------------------------------------------------------
+
+[tool.pyright]
+include = ["app", "tests", "migrations"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+reportMissingTypeStubs = false
+
+# --- Tests -------------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+filterwarnings = ["error"]
+
+# --- Architecture ------------------------------------------------------------------------
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Clean Architecture: dependencies point inward"
+type = "layers"
+layers = [
+    "app.main | app.jobs",
+    "app.presentation",
+    "app.infrastructure",
+    "app.application",
+    "app.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Entities and use cases are framework-free"
+type = "forbidden"
+source_modules = ["app.domain", "app.application"]
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "pydantic",
+    "pydantic_settings",
+    "sqlalchemy",
+    "boto3",
+    "botocore",
+    "PIL",
+    "httpx",
+    "jwt",
+]

@@ -1,0 +1,142 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer push waits instead of cancelling a half-applied one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to production
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # OIDC: assume the deploy role without stored AWS keys
+    # What belongs to one AWS account or person comes from the environment's variables;
+    # the repository names none of it (docs/setup.md).
+    env:
+      TF_ENV: prod
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      WEB_ORIGINS: ${{ vars.WEB_ORIGINS }}
+      MAIL_FROM: ${{ vars.MAIL_FROM }}
+      ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_mail_from: ${{ vars.MAIL_FROM }}
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+    steps:
+      - name: Check the project is set up (docs/setup.md)
+        run: |
+          missing=0
+          for name in AWS_DEPLOY_ROLE_ARN ECR_REPOSITORY TF_STATE_BUCKET AWS_REGION WEB_ORIGINS MAIL_FROM ALERT_EMAIL; do
+            if [ -z "$(printenv "$name")" ]; then
+              echo "::error::Variable $name is not set on the 'production' environment (see docs/setup.md, step 2)"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.4
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Tagged with the commit (tags are immutable); the functions pin the digests.
+      # Each build is retried once: public.ecr.aws throttles anonymous pulls from shared
+      # runner addresses (429).
+      - name: Build and push the API image
+        id: api_image
+        continue-on-error: true
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with: &api_image
+          context: .
+          target: api
+          platforms: linux/arm64
+          push: true
+          provenance: false # Lambda wants a plain image manifest
+          tags: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}-api
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push the API image (retry)
+        id: api_image_retry
+        if: steps.api_image.outcome == 'failure'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with: *api_image
+
+      - name: Build and push the jobs image
+        id: jobs_image
+        continue-on-error: true
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with: &jobs_image
+          context: .
+          target: jobs
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}-jobs
+          cache-from: type=gha,scope=jobs
+          cache-to: type=gha,mode=max,scope=jobs
+
+      - name: Build and push the jobs image (retry)
+        id: jobs_image_retry
+        if: steps.jobs_image.outcome == 'failure'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with: *jobs_image
+
+      - run: uv sync --frozen
+
+      - name: Terraform apply
+        env:
+          API_IMAGE_URI: ${{ env.ECR_REPOSITORY }}@${{ steps.api_image.outputs.digest || steps.api_image_retry.outputs.digest }}
+          JOBS_IMAGE_URI: ${{ env.ECR_REPOSITORY }}@${{ steps.jobs_image.outputs.digest || steps.jobs_image_retry.outputs.digest }}
+        run: |
+          # WEB_ORIGINS is comma-separated; the Terraform variable is a list.
+          TF_VAR_web_origins=$(jq -cn --arg origins "$WEB_ORIGINS" \
+            '$origins | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')
+          export TF_VAR_web_origins
+          make tf-init
+          terraform -chdir=infra plan -input=false -var-file="envs/$TF_ENV/$TF_ENV.tfvars" \
+            -var "api_image_uri=$API_IMAGE_URI" -var "jobs_image_uri=$JOBS_IMAGE_URI" -out=tfplan
+          terraform -chdir=infra apply -input=false tfplan
+
+      # After the apply: the first deploy creates the cluster. Migrations must therefore
+      # stay compatible with the code that was running before (expand, then contract).
+      - name: Migrate the database
+        run: make migrate
+
+      - name: Smoke test
+        run: |
+          api_url=$(terraform -chdir=infra output -raw api_url)
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 "$api_url/health/ready"

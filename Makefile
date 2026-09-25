@@ -1,0 +1,57 @@
+# Everything runs in AWS; these targets check, build and deploy. `make help` lists them.
+.DEFAULT_GOAL := help
+TF_ENV ?= prod
+TF := terraform -chdir=infra
+
+.PHONY: help install fmt lint typecheck arch test check image tf-init plan apply migrate
+
+help: ## List the targets
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
+
+install: ## Install dependencies and the git hooks
+	uv sync --frozen
+	uv run pre-commit install
+
+fmt: ## Format Python and Terraform
+	uv run ruff format .
+	uv run ruff check --fix .
+	terraform fmt -recursive infra
+
+lint: ## Lint (ruff, formatting, Terraform formatting)
+	uv run ruff check .
+	uv run ruff format --check .
+	terraform fmt -check -recursive infra
+
+typecheck: ## pyright, strict
+	uv run pyright
+
+arch: ## Enforce the Clean Architecture layers
+	uv run lint-imports
+
+test: ## Unit tests
+	uv run pytest
+
+check: lint typecheck arch test ## Everything CI runs
+
+image: ## Build both Lambda images (linux/arm64): mvp-api:api and mvp-api:jobs
+	docker buildx build --platform linux/arm64 --target api --tag mvp-api:api --load .
+	docker buildx build --platform linux/arm64 --target jobs --tag mvp-api:jobs --load .
+
+tf-init: ## terraform init against the remote state (needs TF_STATE_BUCKET and AWS_REGION)
+	@test -n "$(TF_STATE_BUCKET)" -a -n "$(AWS_REGION)" || { echo "Set TF_STATE_BUCKET and AWS_REGION (docs/setup.md)"; exit 1; }
+	$(TF) init -input=false \
+		-backend-config="bucket=$(TF_STATE_BUCKET)" \
+		-backend-config="key=mvp-api/$(TF_ENV).tfstate" \
+		-backend-config="region=$(AWS_REGION)"
+
+TF_IMAGES = -var api_image_uri=$(API_IMAGE_URI) -var jobs_image_uri=$(JOBS_IMAGE_URI)
+
+plan: ## terraform plan (API_IMAGE_URI=... JOBS_IMAGE_URI=..., as <repository>@sha256:...)
+	$(TF) plan -var-file=envs/$(TF_ENV)/$(TF_ENV).tfvars $(TF_IMAGES)
+
+apply: ## terraform apply (API_IMAGE_URI=... JOBS_IMAGE_URI=...)
+	$(TF) apply -var-file=envs/$(TF_ENV)/$(TF_ENV).tfvars $(TF_IMAGES)
+
+migrate: ## Apply database migrations to the deployed cluster
+	DSQL_ENDPOINT=$$($(TF) output -raw dsql_endpoint) AWS_REGION=$$($(TF) output -raw region) \
+		uv run alembic upgrade head
