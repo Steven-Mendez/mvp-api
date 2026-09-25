@@ -214,6 +214,21 @@ class TestPagination:
             (p.price for p in products), reverse=True
         )
 
+    async def test_a_numbered_page_past_the_end_is_empty_but_keeps_the_total(
+        self, any_uow: UnitOfWork, catalog: tuple[Tenant, list[Product]]
+    ) -> None:
+        acme, products = catalog
+        query = _query("price", descending=True)
+
+        boundary = await any_uow.products.page(acme.workspace.id, query, 7, 1)
+        just_past = await any_uow.products.page(acme.workspace.id, query, 8, 1)
+        # The route puts no ceiling on `page`: an offset past bigint must not reach Postgres.
+        far_past = await any_uow.products.page(acme.workspace.id, query, 2**63, 100)
+
+        assert [p.price for p in boundary[0]] == [min(p.price for p in products)]
+        assert (just_past, far_past) == (([], 7), ([], 7))
+        assert boundary[1] == 7
+
     async def test_a_last_full_page_has_no_next_cursor(
         self, any_uow: UnitOfWork, catalog: tuple[Tenant, list[Product]]
     ) -> None:

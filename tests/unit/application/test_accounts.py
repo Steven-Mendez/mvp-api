@@ -2,7 +2,8 @@
 
 - registering creates the pool account and its profile; a taken email answers the same
   and changes nothing; the pool's password policy is a validation error
-- an invitation token at registration joins right away; a bad one is ignored
+- an invitation token at registration joins right away; a bad one is ignored, and one
+  that expires mid-join changes nothing
 - the first request of a subject creates its row, asking the pool once; a subject
   presenting an email that another account holds is never linked to it
 - naming the profile moves onboarding on
@@ -11,6 +12,8 @@
   account holds goes, including workspaces it deleted earlier; a pool failure does not
   undo it
 """
+
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -53,6 +56,35 @@ class TestRegister:
         assert await world.uow.members.get(acme.id, sub) is not None
         assert user is not None
         assert user.onboarding_status == "completed"
+
+    async def test_an_invitation_expiring_mid_join_changes_nothing(
+        self, world: World, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        owner = await world.user("owner@example.com")
+        acme = await world.workspace(owner)
+        sent = await world.workspaces.invite(
+            acme.id, "new@example.com", await world.role_id(acme, "member"), owner
+        )
+        expires_at = sent.view.invitation.expires_at
+        calls = 0
+
+        def clock() -> datetime:
+            # The first check sees a live invitation; it has expired by the next one.
+            nonlocal calls
+            calls += 1
+            return expires_at - timedelta(seconds=1 if calls == 1 else -1)
+
+        monkeypatch.setattr("app.domain.workspace.now", clock)
+        token = world.mailer.token_sent_to("new@example.com")
+        await world.accounts.register("new@example.com", "long enough", "New", token)
+        sub = world.identity.accounts["new@example.com"]
+        user = await world.uow.users.get(sub)
+        invitation = await world.uow.invitations.get(sent.view.invitation.id)
+        assert await world.uow.members.get(acme.id, sub) is None
+        assert invitation is not None
+        assert invitation.status == "pending"
+        assert user is not None
+        assert user.onboarding_status == "workspace_pending"
 
     async def test_a_bad_invitation_token_is_ignored(self, world: World) -> None:
         await world.accounts.register("new@example.com", "long enough", "New", "stale-token")

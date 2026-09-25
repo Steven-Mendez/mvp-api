@@ -77,7 +77,7 @@ def parse_order(order_by: str | None) -> tuple[str, bool]:
     return name, value.startswith("-")
 
 
-def ensure_room_for_image(image_count: int) -> None:
+def ensure_room_for_image_count(image_count: int) -> None:
     if image_count >= MAX_IMAGES_PER_PRODUCT:
         raise ConflictError(f"A product can have at most {MAX_IMAGES_PER_PRODUCT} images")
 
@@ -160,7 +160,7 @@ class Product:
             self.updated_at = now()
 
     def ensure_room_for_image(self) -> None:
-        ensure_room_for_image(len(self.images))
+        ensure_room_for_image_count(len(self.images))
 
     def add_image(
         self,

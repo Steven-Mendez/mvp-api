@@ -6,7 +6,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from app.domain.access import CATALOG, DEFAULT_MEMBER_ROLE, OWNER_ACTIONS, OWNER_ONLY, OWNER_ROLE
+from app.domain.access import CATALOG, DEFAULT_MEMBER_ROLE, OWNER_ACTIONS, OWNER_ROLE
 from app.domain.errors import ConflictError, ForbiddenError, GoneError, InvalidError
 from app.domain.ids import new_id, now
 
@@ -51,8 +51,8 @@ def is_valid_slug(slug: str) -> bool:
 
 
 def validate_permissions(permissions: list[str]) -> set[str]:
-    if OWNER_ONLY in permissions:
-        raise ForbiddenError("Only the owner can delete a workspace")
+    if OWNER_ACTIONS & set(permissions):
+        raise ForbiddenError("Only the owner can delete or transfer a workspace")
     if not set(permissions).issubset(CATALOG):
         raise InvalidError("Unknown permission")
     return set(permissions)
@@ -120,7 +120,11 @@ class Workspace:
         return None
 
     def permissions_for(self, user_id: str, role_permissions: list[str]) -> list[str]:
-        return list(CATALOG) if user_id == self.owner_id else role_permissions
+        """The owner holds every catalog permission plus the owner-only actions that are not
+        assignable to a role, so a client can derive every button from this list alone."""
+        if user_id != self.owner_id:
+            return role_permissions
+        return list(CATALOG) + sorted(OWNER_ACTIONS - CATALOG.keys())
 
     def ensure_single_owner(self, owner_ids: list[str]) -> None:
         """Exactly one member holds the protected owner role, and it is `owner_id`."""

@@ -65,7 +65,7 @@ async def _domain_error(_request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": exc.detail}, status_code=status, headers=headers)
 
 
-async def _conflict(_request: Request, _exc: Exception) -> JSONResponse:
+async def _concurrency_conflict(_request: Request, _exc: Exception) -> JSONResponse:
     return JSONResponse(
         {"detail": "Someone changed this at the same time, try again"}, status_code=409
     )
@@ -80,5 +80,5 @@ async def _unhandled(request: Request, _exc: Exception) -> JSONResponse:
 
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(errors.DomainError, _domain_error)
-    app.add_exception_handler(ConcurrencyConflictError, _conflict)
+    app.add_exception_handler(ConcurrencyConflictError, _concurrency_conflict)
     app.add_exception_handler(Exception, _unhandled)

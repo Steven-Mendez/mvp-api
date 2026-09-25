@@ -1,4 +1,5 @@
-"""The HTTP API: composition root. Lambda Web Adapter runs it with uvicorn (see run.sh)."""
+"""The HTTP API: composition root. Lambda Web Adapter runs it with uvicorn (the `api` stage
+of the Dockerfile; `make run` locally)."""
 
 import asyncio
 

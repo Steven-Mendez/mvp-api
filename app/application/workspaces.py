@@ -91,8 +91,10 @@ async def join_with_invitation(uow: UnitOfWork, token: str, user_id: str) -> Wor
     await configurable_role(uow, workspace.id, invitation.role_id)
     if await uow.members.get(workspace.id, user_id) is not None:
         raise ConflictError("You already belong to this workspace")
-    uow.members.add(Member.join(workspace.id, user_id, invitation.role_id))
+    # Accept before adding the member: an invitation that expires in between must fail
+    # before anything changes, or a caller that swallows the error would commit half of it.
     invitation.accept(user_id, user.email)
+    uow.members.add(Member.join(workspace.id, user_id, invitation.role_id))
     user.joined_a_workspace()
     await uow.flush()
     return await workspace_view(uow, workspace, user_id)

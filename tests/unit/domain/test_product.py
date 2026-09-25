@@ -20,7 +20,7 @@ from app.domain.errors import ConflictError, InvalidError, NotFoundError, Precon
 from app.domain.product import (
     MAX_IMAGES_PER_PRODUCT,
     ProductStatus,
-    ensure_room_for_image,
+    ensure_room_for_image_count,
     parse_order,
     readable_size,
 )
@@ -152,10 +152,10 @@ class TestImages:
         assert product.storage_keys == ["media/0.webp", "media/0_thumb.webp", "media/1.webp"]
 
     def test_the_image_limit_counts_what_the_database_holds(self) -> None:
-        ensure_room_for_image(MAX_IMAGES_PER_PRODUCT - 1)
+        ensure_room_for_image_count(MAX_IMAGES_PER_PRODUCT - 1)
 
         with pytest.raises(ConflictError):
-            ensure_room_for_image(MAX_IMAGES_PER_PRODUCT)
+            ensure_room_for_image_count(MAX_IMAGES_PER_PRODUCT)
 
 
 class TestQuotas:

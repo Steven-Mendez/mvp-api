@@ -45,7 +45,7 @@ class TestCreate:
         assert await _status(world, owner) == "workspace_pending"
         view = await world.workspaces.create("  Acme  ", "acme", owner)
         assert (view.workspace.name, view.workspace.owner_id) == ("Acme", owner)
-        assert view.permissions == list(CATALOG)
+        assert view.permissions == [*CATALOG, "workspace.transfer"]
         roles = await world.uow.roles.of_workspace(view.workspace.id)
         assert [role.name for role in roles] == ["owner", "admin", "member", "viewer"]
         assert view.role_id == roles[0].id

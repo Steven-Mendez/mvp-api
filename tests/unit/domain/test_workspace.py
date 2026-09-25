@@ -101,10 +101,10 @@ class TestGrants:
     def test_anything_else_is_up_to_the_role(self) -> None:
         assert factories.workspace().grants("member", "products.create") is None
 
-    def test_the_owner_holds_the_whole_catalog(self) -> None:
+    def test_the_owner_holds_the_whole_catalog_and_the_owner_actions(self) -> None:
         workspace = factories.workspace(owner_id="owner")
 
-        assert workspace.permissions_for("owner", []) == list(CATALOG)
+        assert workspace.permissions_for("owner", []) == [*CATALOG, "workspace.transfer"]
         assert workspace.permissions_for("member", ["products.read"]) == ["products.read"]
 
 
@@ -178,9 +178,10 @@ class TestPermissions:
     def test_known_permissions_pass_as_a_set(self) -> None:
         assert validate_permissions(["products.create", "products.create"]) == {"products.create"}
 
-    def test_owner_only_actions_are_forbidden(self) -> None:
+    @pytest.mark.parametrize("action", ["workspace.delete", "workspace.transfer"])
+    def test_owner_actions_are_forbidden_not_unknown(self, action: str) -> None:
         with pytest.raises(ForbiddenError):
-            validate_permissions(["products.create", "workspace.delete"])
+            validate_permissions(["products.create", action])
 
     def test_unknown_permissions_are_invalid(self) -> None:
         with pytest.raises(InvalidError):

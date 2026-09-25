@@ -367,8 +367,13 @@ class SqlProductRepository(_Repository):
     ) -> tuple[list[Product], int]:
         filtered = self._filtered(workspace_id, query)
         total = await self._count(filtered.with_only_columns(products.c.id))
+        offset = (page - 1) * size
+        if offset >= total:
+            # Past the last row there is nothing to fetch, and `page` has no ceiling:
+            # an offset beyond bigint would make asyncpg reject the query.
+            return [], total
         items = await self._session.scalars(
-            filtered.order_by(*self._order(query)).offset((page - 1) * size).limit(size)
+            filtered.order_by(*self._order(query)).offset(offset).limit(size)
         )
         return list(items), total
 

@@ -29,8 +29,12 @@ SQUARE_SIZE = 256
 MAX_IMAGE_SIDE = 2048
 UPLOAD_NOT_FOUND = "Upload not found: it was never uploaded, expired or was already used"
 
-# Pillow refuses images above this many pixels (decompression bombs).
-Image.MAX_IMAGE_PIXELS = 40_000_000
+# The largest image `_open` decodes, against decompression bombs. Pillow itself only warns
+# (`DecompressionBombWarning`) above this and raises only above twice it, so `_open`
+# enforces the limit from the header before decoding anything.
+MAX_PIXELS = 40_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+MISSING_OBJECT_CODES = frozenset({"404", "NoSuchKey", "NotFound"})
 
 
 class S3MediaStorage:
@@ -72,7 +76,8 @@ class S3MediaStorage:
                 s3().head_object, Bucket=self._bucket, Key=self._pending(upload_key)
             )
         except ClientError as exc:
-            raise NotFoundError(UPLOAD_NOT_FOUND) from exc
+            _raise_if_missing(exc)
+            raise
         size = head["ContentLength"]
         if size > self._max_bytes:
             await self.delete(self._pending(upload_key))
@@ -118,9 +123,14 @@ class S3MediaStorage:
 
     async def _read_pending(self, upload_key: str) -> bytes:
         await self.pending_size(upload_key)
-        response = await asyncio.to_thread(
-            s3().get_object, Bucket=self._bucket, Key=self._pending(upload_key)
-        )
+        try:
+            response = await asyncio.to_thread(
+                s3().get_object, Bucket=self._bucket, Key=self._pending(upload_key)
+            )
+        except ClientError as exc:
+            # A concurrent confirm consumed it between the HEAD and the GET.
+            _raise_if_missing(exc)
+            raise
         return await asyncio.to_thread(response["Body"].read)
 
     async def _put(self, key: str, body: bytes) -> None:
@@ -146,14 +156,30 @@ class S3MediaStorage:
         return _webp(image)
 
 
+def _raise_if_missing(exc: ClientError) -> None:
+    """A missing object is the client's 404; throttling or a 5xx stays a retryable 500."""
+    if exc.response.get("Error", {}).get("Code") in MISSING_OBJECT_CODES:
+        raise NotFoundError(UPLOAD_NOT_FOUND) from exc
+
+
 def _open(data: bytes) -> Image.Image:
     """Decode an upload whatever it claimed to be; only real images get through."""
     try:
         with Image.open(io.BytesIO(data)) as probe:
             probe.verify()
+            too_big = probe.width * probe.height > MAX_PIXELS
+        if too_big:
+            # The header alone says it is too large: refuse before decoding a pixel.
+            raise InvalidError("The upload is not a valid image")
         image = Image.open(io.BytesIO(data))
         image.load()
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError) as exc:
+    except (
+        UnidentifiedImageError,
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,  # raised, not warned, when warnings are errors
+        OSError,
+        SyntaxError,
+    ) as exc:
         raise InvalidError("The upload is not a valid image") from exc
     if image.format not in {"JPEG", "PNG", "WEBP", "GIF"}:
         raise UnsupportedMediaTypeError("Unsupported image type")

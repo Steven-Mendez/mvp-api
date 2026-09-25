@@ -1,5 +1,5 @@
 """Rules the domain refuses to break, by kind. The API maps each kind to one HTTP status
-(`app.api.errors`); the message reaches the client verbatim as `detail`."""
+(`app.presentation.errors`); the message reaches the client verbatim as `detail`."""
 
 
 class DomainError(Exception):

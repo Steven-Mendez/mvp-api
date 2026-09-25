@@ -26,7 +26,7 @@ from app.domain.product import (
     ProductImage,
     ProductQuotas,
     ProductStatus,
-    ensure_room_for_image,
+    ensure_room_for_image_count,
     parse_order,
 )
 
@@ -131,7 +131,7 @@ class ProductService:
         uow = self._uow
         if not await uow.products.exists(workspace_id, product_id):
             found(None, PRODUCT_NOT_FOUND)
-        ensure_room_for_image(await uow.products.count_images(product_id))
+        ensure_room_for_image_count(await uow.products.count_images(product_id))
         return self._media.presign(content_type, PRODUCT_IMAGE_TYPES)
 
     async def confirm_image(
@@ -151,7 +151,7 @@ class ProductService:
             return existing
         size = await self._media.pending_size(upload_key)
         self._quotas.ensure_room_for_bytes(await uow.products.storage_bytes(workspace_id), size)
-        ensure_room_for_image(await uow.products.count_images(product_id))
+        ensure_room_for_image_count(await uow.products.count_images(product_id))
 
         stored = await self._media.store_image(upload_key)
         try:
