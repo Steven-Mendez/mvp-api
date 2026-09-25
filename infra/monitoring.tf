@@ -1,6 +1,7 @@
 # Knowing when something breaks or costs more than expected: a monthly budget, a
 # handful of alarms by email, and a queue that keeps every job that failed for good.
-# Idle cost: about $0.80 a month (5 alarms and one custom metric).
+# Idle cost: nothing within CloudWatch's always-free tier (10 alarms, 10 custom metrics);
+# past it, $0.50 a month for the 5 alarms (the custom metric bills only when errors occur).
 
 # --- budget ---------------------------------------------------------------------------
 
