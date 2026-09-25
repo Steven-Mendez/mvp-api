@@ -1,7 +1,7 @@
 """In-memory stand-ins for every port in `app.application.ports`.
 
 The unit tests run the use cases against these; the end-to-end tests keep the real
-database and swap only the AWS adapters for them. `tests/integration/test_fake_contract.py`
+database and swap only the AWS adapters for them. `tests/integration/repositories/`
 runs the same scenarios against this unit of work and the SQL one, so the two cannot
 drift apart unnoticed.
 """

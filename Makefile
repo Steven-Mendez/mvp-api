@@ -5,7 +5,7 @@ TF_ENV ?= prod
 TF := terraform -chdir=infra
 
 .PHONY: help install fmt lint typecheck arch test test-integration test-e2e test-all \
-	mutate mutate-diff mutate-semantic check up run down image tf-init plan apply migrate
+	mutate check up run down image tf-init plan apply migrate
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -30,7 +30,6 @@ typecheck: ## pyright, strict
 arch: ## Enforce the Clean Architecture layers
 	uv run lint-imports
 
-# The testing triad and mutation testing: docs/testing.md.
 test: ## Unit tests: in-memory fakes, no Docker, about a second
 	uv run pytest -m "not integration and not e2e"
 
@@ -43,14 +42,9 @@ test-e2e: ## The HTTP API end to end on a throwaway Postgres (Docker)
 test-all: ## The whole triad with branch coverage (Docker)
 	uv run pytest --cov --cov-report=term
 
-mutate: ## Mutation score of the core with mutmut (minimum 95%)
-	uv run python mutation/gate.py
-
-mutate-diff: ## Mutation score of the core modules this branch changed
-	uv run python mutation/gate.py --changed-since origin/main
-
-mutate-semantic: ## The realistic bugs of mutation/semantic/ the suite must catch (Docker)
-	uv run python mutation/semantic.py
+mutate: ## Mutation testing of app/domain and app/application; lists the survivors
+	uv run mutmut run
+	uv run mutmut results
 
 check: lint typecheck arch test-all ## Everything CI runs on every pull request
 

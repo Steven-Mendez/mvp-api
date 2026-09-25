@@ -113,9 +113,11 @@ Tooling:
 - **ruff** for lint and format.
 - **pyright** in strict mode.
 - **import-linter** for the layers.
-- **pytest** for tests, in three tiers (unit, integration, end to end), with
-  **testcontainers** for Postgres and **mutmut** plus semantic mutants for mutation
-  testing. See [docs/testing.md](docs/testing.md).
+- **pytest** for tests, in three tiers: `tests/unit` (entities and use cases on
+  in-memory fakes, no Docker), `tests/integration` (repositories and migrations on a
+  throwaway Postgres via **testcontainers**) and `tests/e2e` (the HTTP API on it).
+- **mutmut** for mutation testing of the core: `make mutate`, then
+  `uv run mutmut show <name>` for each survivor.
 - **pre-commit** for the git hooks.
 
 ## Deploying

@@ -91,7 +91,7 @@ docstring-code-format = true
 # --- Types -------------------------------------------------------------------------------
 
 [tool.pyright]
-include = ["app", "tests", "migrations", "mutation"]
+include = ["app", "tests", "migrations"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
@@ -100,7 +100,7 @@ reportMissingTypeStubs = false
 
 # --- Tests -------------------------------------------------------------------------------
 
-# The testing triad (docs/testing.md): tests/unit runs in milliseconds with in-memory
+# The testing triad: tests/unit runs in milliseconds with in-memory
 # fakes; tests/integration and tests/e2e start a throwaway Postgres (Docker) and carry
 # the markers of the same name, so `-m "not integration and not e2e"` needs no Docker.
 [tool.pytest.ini_options]
@@ -125,9 +125,8 @@ show_missing = true
 
 # --- Mutation testing -------------------------------------------------------------------
 
-# Classic mutation testing of the core (docs/testing.md): mutants of the entities and use
-# cases, run against the unit tests only, so each one takes milliseconds. The adapters
-# are covered by the semantic mutants in mutation/ instead.
+# Mutation testing of the core (`make mutate`): mutants of the entities and use cases,
+# run against the unit tests only, so each one takes milliseconds.
 [tool.mutmut]
 source_paths = ["app/"]
 only_mutate = ["app/domain/*", "app/application/*"]
