@@ -30,10 +30,33 @@ variable "github_repository" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = "Numeric ID of the repository's owner: gh api repos/<owner>/<repo> --jq .owner.id"
+  type        = number
+}
+
+variable "github_repository_id" {
+  description = "Numeric ID of the repository: gh api repos/<owner>/<repo> --jq .id"
+  type        = number
+}
+
 variable "github_environment" {
   description = "GitHub environment the deploy job runs in; only it may assume the role."
   type        = string
   default     = "production"
+}
+
+locals {
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
+  # The OIDC subject GitHub issues for the deploy job. New repositories get the
+  # immutable form, which pins the owner and repository IDs: a repository recreated
+  # under the same name cannot assume the role. The name-only form covers repositories
+  # that still use it. Both are exact matches, no wildcards.
+  github_subjects = [
+    "repo:${local.github_owner}@${var.github_owner_id}/${local.github_repo}@${var.github_repository_id}:environment:${var.github_environment}",
+    "repo:${var.github_repository}:environment:${var.github_environment}",
+  ]
 }
 
 provider "aws" {
@@ -136,7 +159,7 @@ resource "aws_iam_role" "deploy" {
       Condition = {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:environment:${var.github_environment}"
+          "token.actions.githubusercontent.com:sub" = local.github_subjects
         }
       }
     }]

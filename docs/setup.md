@@ -33,11 +33,19 @@ This creates what the deploy depends on:
 - The role the CD workflow assumes.
 
 ```sh
+repo=<owner>/<repo>
 terraform -chdir=infra/bootstrap init
 terraform -chdir=infra/bootstrap apply \
-  -var github_repository=<owner>/<repo> \
+  -var github_repository=$repo \
+  -var github_owner_id=$(gh api repos/$repo --jq .owner.id) \
+  -var github_repository_id=$(gh api repos/$repo --jq .id) \
   -var region=us-east-1
 ```
+
+The deploy role trusts only the `production` environment of that exact repository. The
+check uses the OIDC subject GitHub issues, which pins the owner and repository IDs, so a
+repository recreated under the same name cannot assume the role. If you delete and
+recreate the repository, apply the bootstrap again with the new IDs.
 
 Its outputs feed the next step:
 
