@@ -77,11 +77,11 @@ def is_on_own_account(action: str) -> bool:
 
 
 def onboarding_needed_for(action: str) -> frozenset[OnboardingStatus]:
-    """The onboarding statuses allowed to perform `action`."""
+    """The onboarding statuses allowed to perform `action`. The account itself (the
+    profile, sessions, deleting it) is reachable at every step, so someone removed from
+    their only workspace can still leave."""
     if action in {"workspaces.create", "workspaces.availability"}:
         return READY_FOR_A_WORKSPACE
-    if action == "profile.delete" or not (
-        action.startswith(("profile.", "sessions.")) or action == "invitations.accept"
-    ):
-        return ONBOARDED
-    return ANY_STATUS
+    if action.startswith(("profile.", "sessions.")) or action == "invitations.accept":
+        return ANY_STATUS
+    return ONBOARDED

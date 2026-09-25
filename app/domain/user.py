@@ -25,14 +25,17 @@ class User:
 
     @classmethod
     def new(cls, user_id: str, email: str, display_name: str = "") -> User:
-        """An account the identity provider just vouched for: its profile step comes next."""
+        """An account the identity provider just vouched for. Its profile step comes next,
+        unless it already has a name (given at registration): then joining or creating a
+        workspace does."""
+        name = display_name.strip()
         return cls(
             id=user_id,
             email=email.lower(),
-            display_name=display_name.strip(),
+            display_name=name,
             avatar_url=None,
             avatar_key=None,
-            onboarding_status="profile_pending",
+            onboarding_status="workspace_pending" if name else "profile_pending",
             created_at=now(),
         )
 

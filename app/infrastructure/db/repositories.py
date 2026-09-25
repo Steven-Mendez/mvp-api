@@ -1,6 +1,10 @@
 """SQLAlchemy implementations of the repository ports. Queries filter through the table
 columns (`tables.users.c.id`), which keeps them typed; the ORM loads and tracks the
-domain objects, so a change to one is written at commit without a `save` call."""
+domain objects, so a change to one is written at commit without a `save` call.
+
+Bulk UPDATEs and DELETEs of mapped rows name the entity (`update(Invitation)`) and
+synchronize the session: objects it already holds see the change, instead of staying
+stale until the next request."""
 
 import base64
 import binascii
@@ -43,6 +47,9 @@ from app.infrastructure.db.tables import (
     users,
     workspaces,
 )
+
+# Bulk statements update or drop the objects the session already holds (module docstring).
+_SYNCED = {"synchronize_session": "fetch"}
 
 
 class _Repository:
@@ -255,10 +262,15 @@ class SqlMemberRepository(_Repository):
         await self._session.delete(member)
 
     async def remove_all(self, workspace_id: str) -> None:
-        await self._session.execute(delete(members).where(members.c.workspace_id == workspace_id))
+        await self._session.execute(
+            delete(Member).where(members.c.workspace_id == workspace_id),
+            execution_options=_SYNCED,
+        )
 
     async def remove_user(self, user_id: str) -> None:
-        await self._session.execute(delete(members).where(members.c.user_id == user_id))
+        await self._session.execute(
+            delete(Member).where(members.c.user_id == user_id), execution_options=_SYNCED
+        )
 
 
 class SqlInvitationRepository(_Repository):
@@ -293,16 +305,22 @@ class SqlInvitationRepository(_Repository):
 
     async def revoke_pending(self, workspace_id: str) -> None:
         await self._session.execute(
-            update(invitations)
+            update(Invitation)
             .where(invitations.c.workspace_id == workspace_id, invitations.c.status == "pending")
-            .values(status="revoked")
+            .values(status="revoked"),
+            execution_options=_SYNCED,
         )
 
     async def delete_for_role(self, role_id: str) -> None:
-        await self._session.execute(delete(invitations).where(invitations.c.role_id == role_id))
+        await self._session.execute(
+            delete(Invitation).where(invitations.c.role_id == role_id), execution_options=_SYNCED
+        )
 
     async def delete_sent_by(self, user_id: str) -> None:
-        await self._session.execute(delete(invitations).where(invitations.c.invited_by == user_id))
+        await self._session.execute(
+            delete(Invitation).where(invitations.c.invited_by == user_id),
+            execution_options=_SYNCED,
+        )
 
 
 class SqlProductRepository(_Repository):
