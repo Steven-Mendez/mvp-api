@@ -1,0 +1,35 @@
+# The local stack: `make up` starts it, `make down` throws it away.
+#
+#   postgres  stands in for Aurora DSQL.
+#   moto      stands in for Cognito, S3 and DynamoDB, all on one port.
+#
+# moto keeps everything in memory, so Postgres does too: both start empty together and
+# the accounts in one never outlive the other.
+name: mvp-api-local
+
+services:
+  postgres:
+    image: postgres:16-alpine # DSQL speaks PostgreSQL 16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mvp
+    ports: ["5433:5432"]
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "mvp"]
+      interval: 1s
+      retries: 30
+
+  moto:
+    image: motoserver/moto:5.2.3
+    environment:
+      # Pool and client ids derived from their names and settings, so they are the
+      # same on every start and local/api.env can name them.
+      MOTO_COGNITO_IDP_USER_POOL_ID_STRATEGY: HASH
+      MOTO_COGNITO_IDP_USER_POOL_CLIENT_ID_STRATEGY: HASH
+    ports: ["5055:5000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/moto-api/')"]
+      interval: 1s
+      retries: 30

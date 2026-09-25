@@ -1,6 +1,9 @@
 import os
 
-# The app reads its configuration at import; tests never reach AWS.
+# The app reads its configuration at import; tests never reach AWS. Local mode's
+# variables are dropped, so a shell with them exported still runs the production path.
+for name in ("ENVIRONMENT", "DATABASE_URL", "AWS_ENDPOINT_URL"):
+    os.environ.pop(name, None)
 for name, value in {
     "AWS_REGION": "us-east-1",
     "DSQL_ENDPOINT": "cluster.dsql.us-east-1.on.aws",

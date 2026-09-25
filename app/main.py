@@ -27,7 +27,7 @@ def _operation_id(route: APIRoute) -> str:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    setup_logging(settings.log_level)
+    setup_logging(settings.log_level, readable=settings.is_local)
     app = FastAPI(
         title="MVP API",
         version="0.1.0",
@@ -44,7 +44,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.add_middleware(OriginVerificationMiddleware, secret=settings.origin_verify_secret)
+    if not settings.is_local:  # locally there is no CloudFront to add the header
+        app.add_middleware(OriginVerificationMiddleware, secret=settings.origin_verify_secret)
 
     app.include_router(products.router)
     app.include_router(auth.router)

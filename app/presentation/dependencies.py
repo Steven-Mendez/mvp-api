@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.access import AccessService
 from app.application.accounts import AccountService
-from app.application.ports import AccountLookupError
+from app.application.ports import AccountLookupError, EventPublisher, Mailer
 from app.application.products import ProductService
 from app.application.purge import WorkspacePurge
 from app.application.workspaces import WorkspaceService
@@ -27,6 +27,7 @@ from app.infrastructure.aws.storage import S3MediaStorage
 from app.infrastructure.config import get_settings
 from app.infrastructure.db.session import get_session
 from app.infrastructure.db.unit_of_work import SqlUnitOfWork
+from app.infrastructure.local import LogEventPublisher, LogMailer
 from app.presentation.security import VerifiedToken, bearer, unauthorized, verify_token
 
 # --- adapters (one per execution environment) --------------------------------------------
@@ -49,14 +50,19 @@ def _identity() -> CognitoIdentityProvider:
 
 
 @cache
-def _events() -> AppSyncEventPublisher:
+def _events() -> EventPublisher:
     settings = get_settings()
+    if settings.is_local:
+        return LogEventPublisher()
     return AppSyncEventPublisher(settings.appsync_http_domain, settings.aws_region)
 
 
 @cache
-def _mailer() -> SesMailer:
-    return SesMailer(get_settings().mail_from)
+def _mailer() -> Mailer:
+    settings = get_settings()
+    if settings.is_local:
+        return LogMailer()
+    return SesMailer(settings.mail_from)
 
 
 @cache

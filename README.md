@@ -82,6 +82,30 @@ make fmt        # format Python and Terraform
 make help       # every target
 ```
 
+### Running it locally
+
+Needs Docker, and no AWS account. Postgres stands in for Aurora DSQL, and
+[moto](https://github.com/getmoto/moto) stands in for Cognito, S3 and DynamoDB:
+
+```sh
+make up     # start Postgres + moto (local/compose.yaml), create the pool, bucket and table, migrate
+make run    # the API on http://localhost:8000, reloading on changes; docs at /docs
+make down   # stop and throw everything away
+```
+
+`local/api.env` holds the whole configuration (`ENVIRONMENT=local`). What changes from AWS:
+- **Sign in** against moto's Cognito at `http://localhost:5055` with the pool and client
+  ids that `make up` prints. A demo account exists: `demo@example.com` / `password`.
+- **Invitation emails and realtime events** go to the log, not to SES and AppSync. The
+  invitation link is printed there.
+- **No origin header:** there is no CloudFront, so `x-origin-verify` is not checked.
+- **Images** upload to and are served from moto's S3, under `http://localhost:5055`.
+- **Data lives in memory.** moto cannot persist, so Postgres does not either: `make down`
+  or a Docker restart starts both from empty, with the same ids.
+
+Local mode refuses to start on Lambda, and `DATABASE_URL` / `AWS_ENDPOINT_URL` are refused
+outside it.
+
 Tooling:
 - **uv** for dependencies and Python 3.14.
 - **ruff** for lint and format.

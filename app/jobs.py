@@ -18,11 +18,11 @@ from sqlalchemy.pool import NullPool
 from app.application.purge import WorkspacePurge
 from app.infrastructure.aws.storage import S3MediaStorage
 from app.infrastructure.config import get_settings
-from app.infrastructure.db.session import make_engine
+from app.infrastructure.db.session import engine_for
 from app.infrastructure.db.unit_of_work import SqlUnitOfWork
 from app.infrastructure.logging import setup_logging
 
-setup_logging(get_settings().log_level)
+setup_logging(get_settings().log_level, readable=get_settings().is_local)
 
 
 async def purge_deleted_workspaces() -> dict[str, Any]:
@@ -35,7 +35,7 @@ async def purge_deleted_workspaces() -> dict[str, Any]:
     )
     # A new event loop runs every invocation, and connections belong to the loop that
     # opened them: this engine lives for one run only.
-    engine = make_engine(settings.dsql_endpoint, settings.aws_region, poolclass=NullPool)
+    engine = engine_for(settings, poolclass=NullPool)
     try:
         async with AsyncSession(engine, expire_on_commit=False) as session:
             purged = await WorkspacePurge(SqlUnitOfWork(session), media).purge_all()

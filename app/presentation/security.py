@@ -27,7 +27,7 @@ class VerifiedToken:
 @cache
 def _jwks() -> jwt.PyJWKClient:
     # Keys are cached per execution environment; an unknown `kid` refetches them once.
-    return jwt.PyJWKClient(f"{get_settings().cognito_issuer}/.well-known/jwks.json", timeout=5)
+    return jwt.PyJWKClient(get_settings().cognito_jwks_url, timeout=5)
 
 
 def unauthorized(detail: str = "Invalid or expired token") -> HTTPException:
