@@ -70,13 +70,15 @@ The web and mobile apps generate their API client from the OpenAPI spec, served 
 and schema names stable, because the generated clients are named after them.
 
 Realtime events carry `{resource, action, id, owner_id, at}`, published to each member's
-AppSync channel `/users/<cognito sub>`. `tests/test_realtime_contract.py` pins that shape.
+AppSync channel `/users/<cognito sub>`. `tests/unit/infrastructure/test_realtime_contract.py`
+pins that shape.
 
 ## Working on it
 
 ```sh
 make install    # uv sync + git hooks (ruff, pyright, uv lock, terraform fmt)
-make check      # lint, strict types, architecture, tests
+make test       # unit tests: a second, no Docker
+make check      # lint, strict types, architecture, every test tier (Docker)
 make image      # build both Lambda images (linux/arm64): api and jobs
 make fmt        # format Python and Terraform
 make help       # every target
@@ -111,7 +113,9 @@ Tooling:
 - **ruff** for lint and format.
 - **pyright** in strict mode.
 - **import-linter** for the layers.
-- **pytest** for tests.
+- **pytest** for tests, in three tiers (unit, integration, end to end), with
+  **testcontainers** for Postgres and **mutmut** plus semantic mutants for mutation
+  testing. See [docs/testing.md](docs/testing.md).
 - **pre-commit** for the git hooks.
 
 ## Deploying

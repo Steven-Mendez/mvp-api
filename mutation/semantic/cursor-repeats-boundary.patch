@@ -1,0 +1,14 @@
+# category: data-integrity
+# tests: tests/integration tests/e2e
+# why: Cursor pages include their boundary row: infinite scroll shows each page's last item twice.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -381,7 +381,7 @@
+             position = tuple_(column, products.c.id)
+             boundary = tuple_(literal(value), literal(last_id))
+             statement = statement.where(
+-                position < boundary if query.descending else position > boundary
++                position <= boundary if query.descending else position >= boundary
+             )
+         rows = list(
+             await self._session.scalars(statement.order_by(*self._order(query)).limit(size + 1))

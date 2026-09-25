@@ -1,0 +1,14 @@
+# category: data-integrity
+# tests: tests/integration
+# why: Revoking a workspace's pending invitations as a Core UPDATE leaves the invitations already loaded in the session reading 'pending'.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -304,7 +304,7 @@
+ 
+     async def revoke_pending(self, workspace_id: str) -> None:
+         await self._session.execute(
+-            update(Invitation)
++            update(invitations)
+             .where(invitations.c.workspace_id == workspace_id, invitations.c.status == "pending")
+             .values(status="revoked"),
+             execution_options=_SYNCED,

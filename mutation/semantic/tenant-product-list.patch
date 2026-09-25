@@ -1,0 +1,14 @@
+# category: tenant-isolation
+# tests: tests/integration tests/e2e
+# why: Product lists and searches return every workspace's products.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -418,7 +418,7 @@
+ 
+     @staticmethod
+     def _filtered(workspace_id: str, query: ProductFilter) -> Select[tuple[Product]]:
+-        statement = select(Product).where(products.c.workspace_id == workspace_id)
++        statement = select(Product)
+         if query.status is not None:
+             statement = statement.where(products.c.status == query.status)
+         if query.search:

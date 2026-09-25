@@ -1,0 +1,14 @@
+# category: tenant-isolation
+# tests: tests/integration
+# why: Deleting one workspace revokes the pending invitations of every workspace.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -305,7 +305,7 @@
+     async def revoke_pending(self, workspace_id: str) -> None:
+         await self._session.execute(
+             update(Invitation)
+-            .where(invitations.c.workspace_id == workspace_id, invitations.c.status == "pending")
++            .where(invitations.c.status == "pending")
+             .values(status="revoked"),
+             execution_options=_SYNCED,
+         )

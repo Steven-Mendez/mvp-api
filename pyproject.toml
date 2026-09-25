@@ -26,11 +26,14 @@ dev = [
     "boto3-stubs-lite[cognito-idp,dsql,dynamodb,s3,sesv2]>=1.43.102",
     "httpx2>=2.13.1",
     "import-linter>=2.15",
+    "mutmut>=3.8.0",
     "pre-commit>=4.6.2",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.9",
+    "testcontainers[postgres]>=4.15.0",
 ]
 
 [tool.uv]
@@ -88,7 +91,7 @@ docstring-code-format = true
 # --- Types -------------------------------------------------------------------------------
 
 [tool.pyright]
-include = ["app", "tests", "migrations"]
+include = ["app", "tests", "migrations", "mutation"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 venvPath = "."
@@ -97,11 +100,45 @@ reportMissingTypeStubs = false
 
 # --- Tests -------------------------------------------------------------------------------
 
+# The testing triad (docs/testing.md): tests/unit runs in milliseconds with in-memory
+# fakes; tests/integration and tests/e2e start a throwaway Postgres (Docker) and carry
+# the markers of the same name, so `-m "not integration and not e2e"` needs no Docker.
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 addopts = "-q --strict-markers"
 filterwarnings = ["error"]
+markers = [
+    "integration: talks to a real Postgres (Docker)",
+    "e2e: the HTTP API end to end, on a real Postgres (Docker)",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+
+# --- Mutation testing -------------------------------------------------------------------
+
+# Classic mutation testing of the core (docs/testing.md): mutants of the entities and use
+# cases, run against the unit tests only, so each one takes milliseconds. The adapters
+# are covered by the semantic mutants in mutation/ instead.
+[tool.mutmut]
+source_paths = ["app/"]
+only_mutate = ["app/domain/*", "app/application/*"]
+pytest_add_cli_args_test_selection = ["tests/unit/"]
+# Error messages are copy, not behavior: the tests assert the kind of error (its HTTP
+# status), so mutating the wording only adds noise. Neither is logging.
+do_not_mutate_patterns = [
+    'logger\.\w+',
+    'raise \w+Error\(',
+    '^\s*f?"[^"]*"\s*$',
+]
 
 # --- Architecture ------------------------------------------------------------------------
 

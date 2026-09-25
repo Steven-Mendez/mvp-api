@@ -1,0 +1,15 @@
+# category: authorization
+# tests: tests/unit tests/e2e
+# why: Deleting the account needs finished onboarding again: someone removed from their only workspace cannot leave.
+--- a/app/domain/access.py
++++ b/app/domain/access.py
+@@ -82,6 +82,8 @@
+     their only workspace can still leave."""
+     if action in {"workspaces.create", "workspaces.availability"}:
+         return READY_FOR_A_WORKSPACE
+-    if action.startswith(("profile.", "sessions.")) or action == "invitations.accept":
++    if action != "profile.delete" and (
++        action.startswith(("profile.", "sessions.")) or action == "invitations.accept"
++    ):
+         return ANY_STATUS
+     return ONBOARDED

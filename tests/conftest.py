@@ -1,5 +1,7 @@
 import os
 
+import pytest
+
 # The app reads its configuration at import; tests never reach AWS. Local mode's
 # variables are dropped, so a shell with them exported still runs the production path.
 for name in ("ENVIRONMENT", "DATABASE_URL", "AWS_ENDPOINT_URL"):
@@ -19,3 +21,13 @@ for name, value in {
     "RATE_LIMIT_TABLE": "rate-limits",
 }.items():
     os.environ.setdefault(name, value)
+
+pytest_plugins = ["tests.database"]
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Tests under tests/integration and tests/e2e carry that tier's marker."""
+    for item in items:
+        for tier in ("integration", "e2e"):
+            if f"tests/{tier}/" in item.path.as_posix():
+                item.add_marker(tier)

@@ -1,0 +1,14 @@
+# category: concurrency
+# tests: tests/integration
+# why: Every database error is retried, not only lost races: timeouts and bugs run the work three times.
+--- a/app/infrastructure/db/unit_of_work.py
++++ b/app/infrastructure/db/unit_of_work.py
+@@ -64,8 +64,6 @@
+                 raise
+             except DBAPIError as exc:
+                 await self._session.rollback()
+-                if _sqlstate(exc) != _SERIALIZATION_FAILURE:
+-                    raise
+                 if attempt == ATTEMPTS:
+                     raise ConcurrencyConflictError from exc
+                 delay = _BASE_DELAY_SECONDS * attempt + random.uniform(0, _BASE_DELAY_SECONDS)  # noqa: S311

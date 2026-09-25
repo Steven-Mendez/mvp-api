@@ -1,0 +1,14 @@
+# category: authorization
+# tests: tests/e2e
+# why: The product delete route asks for the read permission: viewers can delete products.
+--- a/app/presentation/routers/products.py
++++ b/app/presentation/routers/products.py
+@@ -131,7 +131,7 @@
+     description="Delete one of the workspace's products; 404 if missing or in another workspace.",
+ )
+ async def delete_product(
+-    product_id: str, scope: CanDeleteProducts, service: ProductServiceDep
++    product_id: str, scope: CanReadProducts, service: ProductServiceDep
+ ) -> None:
+     await service.delete(scope.id, product_id)
+ 

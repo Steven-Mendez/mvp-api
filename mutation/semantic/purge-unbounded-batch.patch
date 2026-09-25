@@ -1,0 +1,14 @@
+# category: data-loss
+# tests: tests/integration
+# why: A purge batch takes every product at once and exceeds Aurora DSQL's 3,000 rows per transaction, so big workspaces are never purged.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -401,7 +401,7 @@
+         session = self._session
+         ids = list(
+             await session.scalars(
+-                select(products.c.id).where(products.c.workspace_id == workspace_id).limit(limit)
++                select(products.c.id).where(products.c.workspace_id == workspace_id)
+             )
+         )
+         if not ids:

@@ -39,8 +39,9 @@ jobs:
       - name: Architecture
         run: make arch
 
+      # Unit, integration and end-to-end; the last two start Postgres in Docker.
       - name: Tests
-        run: make test
+        run: make test-all
 
       - name: Terraform validate
         run: |
@@ -48,6 +49,27 @@ jobs:
           terraform -chdir=infra validate
           terraform -chdir=infra/bootstrap init -backend=false -input=false
           terraform -chdir=infra/bootstrap validate
+
+  mutation:
+    name: Mutation score of the changed core
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the merge base with the target branch
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      # Only the domain and use-case modules this pull request touched: seconds, not
+      # minutes. The whole core and the semantic mutants run weekly (mutation.yml).
+      - name: Mutation score
+        run: uv run python mutation/gate.py --changed-since "origin/${{ github.base_ref }}"
 
   image:
     name: Image builds (${{ matrix.target }})

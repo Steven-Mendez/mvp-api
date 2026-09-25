@@ -1,0 +1,14 @@
+# category: data-integrity
+# tests: tests/integration
+# why: Search terms are not escaped: % and _ match anything, so '100%' finds '1000'.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -422,7 +422,7 @@
+         if query.status is not None:
+             statement = statement.where(products.c.status == query.status)
+         if query.search:
+-            escaped = query.search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
++            escaped = query.search
+             pattern = f"%{escaped}%"
+             statement = statement.where(
+                 or_(

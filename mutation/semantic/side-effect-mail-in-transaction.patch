@@ -1,0 +1,26 @@
+# category: side-effects
+# tests: tests/unit
+# why: The invitation is mailed inside the transaction: a retried or failed commit mails links that do not work, and a mail outage blocks inviting.
+--- a/app/application/workspaces.py
++++ b/app/application/workspaces.py
+@@ -381,18 +381,12 @@
+                 workspace_id=workspace_id, email=email, role_id=role_id, invited_by=user_id
+             )
+             uow.invitations.add(invitation)
++            url = f"{self._web_base_url}/invite?workspace={workspace.slug}&token={token}"
++            await self._mailer.send_invitation(email, workspace.name, url)
+             return workspace, invitation, token
+ 
+         workspace, invitation, token = await uow.transaction(issue)
+         url = f"{self._web_base_url}/invite?workspace={workspace.slug}&token={token}"
+-        try:
+-            await self._mailer.send_invitation(email, workspace.name, url)
+-        except Exception:
+-            # The invitation is committed: failing now would lose the only copy of its link.
+-            # The inviter gets the link in the answer to share it instead.
+-            logger.opt(exception=True).warning(
+-                "Invitation {} created, but its mail could not be sent", invitation.id
+-            )
+         return CreatedInvitation(view=InvitationView(invitation, accepted_by=None), url=url)
+ 
+     async def revoke_invitation(self, workspace_id: str, invitation_id: str, user_id: str) -> None:

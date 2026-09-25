@@ -1,0 +1,16 @@
+# category: tenant-isolation
+# tests: tests/unit tests/integration
+# why: Storage used is summed across all workspaces: one big tenant fills everyone's quota.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -349,9 +349,7 @@
+ 
+     async def storage_bytes(self, workspace_id: str) -> int:
+         total = await self._session.scalar(
+-            select(func.coalesce(func.sum(product_images.c.size_bytes), 0)).where(
+-                product_images.c.workspace_id == workspace_id
+-            )
++            select(func.coalesce(func.sum(product_images.c.size_bytes), 0))
+         )
+         return int(total or 0)
+ 

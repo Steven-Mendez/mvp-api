@@ -24,7 +24,7 @@ def user_channel(user_id: str) -> str:
 
 
 def event_payload(event: ChangeEvent) -> dict[str, str]:
-    """What subscribers receive; tests/test_realtime_contract.py pins its shape."""
+    """What subscribers receive; tests/unit/infrastructure/test_realtime_contract.py pins it."""
     return {
         "resource": event.resource,
         "action": event.action,

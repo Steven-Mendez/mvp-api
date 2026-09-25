@@ -1,0 +1,14 @@
+# category: tenant-isolation
+# tests: tests/integration
+# why: Purging one deleted workspace removes every membership of every workspace.
+--- a/app/infrastructure/db/repositories.py
++++ b/app/infrastructure/db/repositories.py
+@@ -147,7 +147,7 @@
+             delete(role_permissions).where(role_permissions.c.role_id.in_(role_ids))
+         )
+         await session.execute(delete(roles).where(roles.c.workspace_id == workspace.id))
+-        await session.execute(delete(members).where(members.c.workspace_id == workspace.id))
++        await session.execute(delete(members))
+         await session.execute(delete(invitations).where(invitations.c.workspace_id == workspace.id))
+         await session.delete(workspace)
+ 

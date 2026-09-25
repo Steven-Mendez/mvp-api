@@ -1,0 +1,14 @@
+# category: authorization
+# tests: tests/unit
+# why: A custom role may be granted deleting the workspace, which only the owner may do.
+--- a/app/domain/workspace.py
++++ b/app/domain/workspace.py
+@@ -51,8 +51,6 @@
+ 
+ 
+ def validate_permissions(permissions: list[str]) -> set[str]:
+-    if OWNER_ONLY in permissions:
+-        raise ForbiddenError("Only the owner can delete a workspace")
+     if not set(permissions).issubset(CATALOG):
+         raise InvalidError("Unknown permission")
+     return set(permissions)
