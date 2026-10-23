@@ -16,7 +16,7 @@ ARG PYTHON_VERSION=3.14
 
 # uv runs in the deps stage, on the build machine: it must be the build platform's binary
 # (a bare `COPY --from=<image>` would fetch the target platform's).
-FROM --platform=$BUILDPLATFORM ghcr.io/astral-sh/uv:0.12.19 AS uv
+FROM --platform=$BUILDPLATFORM ghcr.io/astral-sh/uv:0.13.5 AS uv
 
 FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/python:${PYTHON_VERSION}-slim AS deps
 ARG PYTHON_VERSION
